@@ -1,0 +1,32 @@
+
+# Node.js
+node_modules/
+dist/
+coverage/
+*.log
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Local databases
+*.sqlite
+*.sqlite3
+*.db
+*.db-*
+
+# Operating system
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
