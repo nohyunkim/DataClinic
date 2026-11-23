@@ -6,16 +6,19 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "test": "node --experimental-strip-types --test tests/csv.test.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit --pretty false"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
+    "papaparse": "^5.7.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.0",
+    "@types/papaparse": "^5.5.2",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.4",

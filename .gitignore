@@ -2,6 +2,9 @@
 # Node.js
 node_modules/
 dist/
+.npm-cache/
+.vite/
+.playwright-mcp/
 coverage/
 *.log
 
