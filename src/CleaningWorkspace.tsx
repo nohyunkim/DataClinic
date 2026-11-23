@@ -13,6 +13,7 @@ interface CleaningWorkspaceProps {
   onApply: (data: ParsedCsv) => void
   onReset: () => void
   onDiagnosis: () => void
+  onComparison: () => void
   onUpload: () => void
   onHome: () => void
 }
@@ -33,7 +34,7 @@ const methodDescriptions: Record<CleaningMethod, string> = {
   remove_duplicates: '모든 컬럼의 원본 값이 같은 행 중 첫 행만 남깁니다. 공백과 대소문자는 그대로 비교합니다.',
 }
 
-export default function CleaningWorkspace({ original, working, cleaningCount, onApply, onReset, onDiagnosis, onUpload, onHome }: CleaningWorkspaceProps) {
+export default function CleaningWorkspace({ original, working, cleaningCount, onApply, onReset, onDiagnosis, onComparison, onUpload, onHome }: CleaningWorkspaceProps) {
   const diagnosis = useMemo(() => analyzeData(working), [working])
   const [columnIndex, setColumnIndex] = useState(() => diagnosis.columns.find((column) => column.missingCount > 0)?.index ?? 0)
   const [method, setMethod] = useState<CleaningMethod>('remove_missing')
@@ -77,9 +78,9 @@ export default function CleaningWorkspace({ original, working, cleaningCount, on
   }
 
   return <div className="workspace-shell">
-    <header className="workspace-header"><button className="workspace-brand" type="button" onClick={onHome} aria-label="DataClinic 홈"><span className="brand-mark" aria-hidden="true"><i /><i /><i /><i /></span><span>Data<span>Clinic</span></span></button><div className="workspace-dataset"><FileSpreadsheet size={17} /><strong title={working.fileName}>{working.fileName}</strong></div><div className="workspace-flow" aria-label="작업 단계"><span className="done">업로드</span><ArrowRight size={13} /><span className="done">진단</span><ArrowRight size={13} /><span className="active">정제</span><ArrowRight size={13} /><span>비교 · 준비 중</span><ArrowRight size={13} /><span>다운로드 · 준비 중</span></div></header>
+    <header className="workspace-header"><button className="workspace-brand" type="button" onClick={onHome} aria-label="DataClinic 홈"><span className="brand-mark" aria-hidden="true"><i /><i /><i /><i /></span><span>Data<span>Clinic</span></span></button><div className="workspace-dataset"><FileSpreadsheet size={17} /><strong title={working.fileName}>{working.fileName}</strong></div><div className="workspace-flow" aria-label="작업 단계"><span className="done">업로드</span><ArrowRight size={13} /><span className="done">진단</span><ArrowRight size={13} /><span className="active">정제</span><ArrowRight size={13} /><span>비교</span><ArrowRight size={13} /><span>다운로드</span></div></header>
     <div className="workspace-layout">
-      <aside className="workspace-nav" aria-label="워크스페이스 메뉴"><p>WORKSPACE</p><button type="button" onClick={onDiagnosis}><CircleAlert size={16} /> 데이터 진단</button><a href="#cleaning-table"><Table2 size={16} /> 작업 데이터</a><a href="#impact-preview"><WandSparkles size={16} /> 영향 미리보기</a><button type="button" onClick={onUpload}><ArrowLeft size={16} /> 업로드 화면</button><small>정제는 작업 데이터에만 적용됩니다. 원본은 별도로 보관됩니다.</small></aside>
+      <aside className="workspace-nav" aria-label="워크스페이스 메뉴"><p>WORKSPACE</p><button type="button" onClick={onDiagnosis}><CircleAlert size={16} /> 데이터 진단</button><a href="#cleaning-table"><Table2 size={16} /> 작업 데이터</a><a href="#impact-preview"><WandSparkles size={16} /> 영향 미리보기</a><button type="button" onClick={onComparison}><ArrowRight size={16} /> 정제 전후 비교</button><button type="button" onClick={onUpload}><ArrowLeft size={16} /> 업로드 화면</button><small>정제는 작업 데이터에만 적용됩니다. 원본은 별도로 보관됩니다.</small></aside>
       <main className="workspace-main"><div className="workspace-title"><span className="section-kicker">03 / DATA CLEANING</span><h1>데이터 정제</h1><p>방법을 선택하고 예상 변화를 확인한 뒤 적용하세요.</p></div>
         {notice && <div className="cleaning-notice" role="status">{notice}</div>}
         <section className="workspace-card" aria-label="작업 데이터 요약"><div className="workspace-section-head"><div><span className="section-kicker">WORKING DATA</span><h2>현재 작업 데이터</h2></div><span className="workspace-subtle">정제 적용 {cleaningCount}회 · 원본 {original.rows.length.toLocaleString()}행 보존</span></div><div className="workspace-summary"><div><span>현재 행</span><strong>{diagnosis.rowCount.toLocaleString()}</strong></div><div><span>컬럼</span><strong>{diagnosis.columnCount.toLocaleString()}</strong></div><div><span>결측 셀</span><strong>{diagnosis.missingCellCount.toLocaleString()}</strong></div><div><span>중복 행</span><strong>{diagnosis.duplicateRows.length.toLocaleString()}</strong></div></div></section>

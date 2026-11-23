@@ -54,7 +54,7 @@ export default function UploadScreen({ initialSample, parsed, onParsed, onBack }
   return <main className="upload-page container">
     <button className="back-link" type="button" onClick={onBack}><ArrowLeft size={17} /> 랜딩 페이지로</button>
     <div className="upload-heading"><span className="section-kicker">01 / CSV 업로드</span><h1>데이터를 먼저 살펴볼게요</h1><p>CSV 파일을 선택하면 컬럼과 처음 10개 행을 미리 보여드립니다.</p></div>
-    <div className="workflow-steps" aria-label="작업 단계"><span className="current">업로드</span><span>진단</span><span>정제</span><span>비교 · 준비 중</span><span>다운로드 · 준비 중</span></div>
+    <div className="workflow-steps" aria-label="작업 단계"><span className="current">업로드</span><span>진단</span><span>정제</span><span>비교</span><span>다운로드</span></div>
     <section className="upload-panel" aria-label="CSV 파일 업로드">
       <div className="upload-panel-heading"><div><h2>CSV 파일 선택</h2><p>UTF-8(또는 UTF-8 BOM) 파일을 기본으로 읽습니다. 한국어가 깨지면 CP949로 바꿔 다시 파싱하세요.</p></div><label className="encoding-field">인코딩<select value={encoding} onChange={(event) => { const next = event.target.value as CsvEncoding; setEncoding(next); if (file) void loadFile(file, next) }}><option value="utf-8">UTF-8</option><option value="euc-kr">CP949</option></select></label></div>
       <input ref={inputRef} className="visually-hidden" type="file" accept=".csv,text/csv" onChange={(event) => { selectFile(event.target.files?.[0]); event.target.value = '' }} aria-label="CSV 파일 선택" />
