@@ -1,0 +1,103 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import { analyzeData } from '../src/diagnosis.ts'
+import { applyCleaning, cloneCsv, previewCleaning } from '../src/cleaning.ts'
+
+const dataset = (columns, rows) => ({ fileName: 'test.csv', fileSize: 100, encoding: 'utf-8', columns, rows })
+const choice = (method, columnIndex = 0) => ({ method, columnIndex })
+
+test('removes only rows missing in the selected column', () => {
+  const original = dataset(['이름', '값'], [['가', '1'], ['', '2'], ['나', ''], ['  ', '3']])
+  const preview = previewCleaning(original, choice('remove_missing'))
+  assert.equal(preview.canApply, true)
+  assert.equal(preview.removedRows, 2)
+  assert.equal(preview.dataLossRate, 0.5)
+  assert.deepEqual(preview.affectedRowIndices, [1, 3])
+  assert.deepEqual(preview.result.rows, [['가', '1'], ['나', '']])
+  assert.equal(preview.before.missingCellCount, 3)
+  assert.equal(preview.after.missingCellCount, 1)
+})
+
+test('mean and median fill only missing cells with numeric results', () => {
+  const original = dataset(['수량'], [['1'], [''], ['3'], ['5'], ['7'], ['0']])
+  const mean = previewCleaning(original, choice('fill_mean'))
+  assert.equal(mean.replacementValue, '3.2')
+  assert.equal(mean.changedCells, 1)
+  assert.equal(mean.result.rows[1][0], '3.2')
+  assert.equal(mean.result.rows[5][0], '0')
+  assert.equal(mean.after.missingCellCount, 0)
+  const median = previewCleaning(original, choice('fill_median'))
+  assert.equal(median.replacementValue, '3')
+  assert.equal(median.result.rows[1][0], '3')
+  const even = previewCleaning(dataset(['값'], [['1'], [''], ['3'], ['5'], ['7']]), choice('fill_median'))
+  assert.equal(even.replacementValue, '4')
+})
+
+test('mode keeps the first encountered raw value on a tie', () => {
+  const original = dataset(['문자'], [['A'], ['b'], ['b'], ['A'], ['']])
+  const preview = previewCleaning(original, choice('fill_mode'))
+  assert.equal(preview.replacementValue, 'A')
+  assert.equal(preview.result.rows[4][0], 'A')
+  assert.equal(preview.changedCells, 1)
+})
+
+test('removes later exact duplicate rows and blocks a no-op', () => {
+  const original = dataset(['값'], [['a'], ['a '], ['a'], ['A'], ['a']])
+  const preview = previewCleaning(original, choice('remove_duplicates'))
+  assert.equal(preview.removedRows, 2)
+  assert.deepEqual(preview.affectedRowIndices, [2, 4])
+  assert.deepEqual(preview.result.rows, [['a'], ['a '], ['A']])
+  assert.equal(preview.after.duplicateRows.length, 0)
+  const noDuplicates = previewCleaning(dataset(['값'], [['a'], ['b']]), choice('remove_duplicates'))
+  assert.equal(noDuplicates.canApply, false)
+  assert.equal(noDuplicates.result, null)
+})
+
+test('blocks all-row deletion, all-missing replacement, mixed types, and empty data', () => {
+  const allMissing = dataset(['값'], [[''], ['  ']])
+  assert.equal(previewCleaning(allMissing, choice('remove_missing')).canApply, false)
+  assert.match(previewCleaning(allMissing, choice('remove_missing')).reason, /모든 데이터 행/)
+  assert.equal(previewCleaning(allMissing, choice('fill_mode')).canApply, false)
+  assert.equal(previewCleaning(allMissing, choice('fill_mean')).canApply, false)
+  const text = dataset(['값'], [['a'], ['']])
+  assert.equal(previewCleaning(text, choice('fill_mean')).canApply, false)
+  assert.equal(previewCleaning(text, choice('fill_median')).canApply, false)
+  const mixed = dataset(['값'], [['1'], ['text'], ['']])
+  assert.equal(previewCleaning(mixed, choice('fill_mode')).canApply, false)
+  assert.equal(previewCleaning(dataset(['값'], []), choice('remove_duplicates')).canApply, false)
+  assert.throws(() => applyCleaning(text, choice('fill_mean')))
+})
+
+test('preview and application match without changing original or working input', () => {
+  const rows = Object.freeze([Object.freeze(['1']), Object.freeze(['']), Object.freeze(['3'])])
+  const original = Object.freeze(dataset(Object.freeze(['값']), rows))
+  const working = cloneCsv(original)
+  const originalSnapshot = JSON.stringify(original)
+  const workingSnapshot = JSON.stringify(working)
+  const preview = previewCleaning(working, choice('fill_mean'))
+  assert.equal(JSON.stringify(original), originalSnapshot)
+  assert.equal(JSON.stringify(working), workingSnapshot)
+  const applied = applyCleaning(working, choice('fill_mean'))
+  assert.deepEqual(applied, preview.result)
+  assert.equal(JSON.stringify(original), originalSnapshot)
+  assert.equal(JSON.stringify(working), workingSnapshot)
+  assert.notEqual(applied.rows, working.rows)
+  assert.notEqual(applied.rows[0], working.rows[0])
+})
+
+test('sequential cleaning uses current work, recalculates diagnosis, and resets from original', () => {
+  const original = dataset(['상품', '분류'], [['펜', ''], ['펜', '문구'], ['펜', '문구']])
+  let working = cloneCsv(original)
+  working = applyCleaning(working, choice('fill_mode', 1))
+  assert.equal(analyzeData(working).missingCellCount, 0)
+  assert.equal(analyzeData(working).duplicateRows.length, 2)
+  working = applyCleaning(working, choice('remove_duplicates'))
+  assert.equal(working.rows.length, 1)
+  assert.equal(analyzeData(working).duplicateRows.length, 0)
+  assert.equal(original.rows.length, 3)
+  assert.equal(original.rows[0][1], '')
+  working = cloneCsv(original)
+  assert.deepEqual(working, original)
+  assert.notEqual(working.rows[0], original.rows[0])
+  assert.equal(analyzeData(working).missingCellCount, 1)
+})
