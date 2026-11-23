@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ArrowRight, Check, ChevronDown, CircleAlert, Columns3, FileSpreadsheet, GitCompareArrows, Menu, ScanSearch, ShieldCheck, Sparkles, WandSparkles } from 'lucide-react'
 import UploadScreen from './UploadScreen'
+import DiagnosisWorkspace from './DiagnosisWorkspace'
 import type { ParsedCsv } from './csv'
 
 const features = [
@@ -31,18 +32,18 @@ function DiagnosticPreview() {
 }
 
 function App() {
-  const [uploadOpen, setUploadOpen] = useState(false)
+  const [view, setView] = useState<'landing' | 'upload' | 'diagnosis'>('landing')
   const [initialSample, setInitialSample] = useState(false)
   const [parsed, setParsed] = useState<ParsedCsv | null>(null)
 
-  if (uploadOpen) {
-    return <div id="top" className="site-shell"><header className="site-header"><div className="container header-inner"><Logo /><span className="header-status">CSV 업로드</span></div></header><UploadScreen initialSample={initialSample} parsed={parsed} onParsed={setParsed} onBack={() => { setUploadOpen(false); setInitialSample(false) }} /></div>
+  if (view !== 'landing') {
+    return <><div hidden={view !== 'upload'} className="site-shell"><header className="site-header"><div className="container header-inner"><Logo /><span className="header-status">CSV 업로드</span></div></header><UploadScreen initialSample={initialSample} parsed={parsed} onParsed={(data) => { setParsed(data); if (data) setView('diagnosis') }} onBack={() => { setView('landing'); setInitialSample(false) }} /></div>{view === 'diagnosis' && parsed && <DiagnosisWorkspace data={parsed} onUpload={() => setView('upload')} onHome={() => { setView('landing'); setInitialSample(false) }} />}</>
   }
 
   return <div id="top" className="site-shell">
-    <header className="site-header"><div className="container header-inner"><Logo /><nav className="desktop-nav" aria-label="주요 메뉴"><a href="#features">주요 기능</a><a href="#how-it-works">이용 흐름</a></nav><div className="header-right"><span className="header-status">업로드 사용 가능 · 진단 준비 중</span><a className="header-link" href="#features">서비스 살펴보기 <ArrowRight size={15} /></a><a className="mobile-menu" href="#features" aria-label="주요 기능으로 이동"><Menu size={22} /></a></div></div></header>
+    <header className="site-header"><div className="container header-inner"><Logo /><nav className="desktop-nav" aria-label="주요 메뉴"><a href="#features">주요 기능</a><a href="#how-it-works">이용 흐름</a></nav><div className="header-right"><span className="header-status">CSV 업로드 · 진단 사용 가능</span><a className="header-link" href="#features">서비스 살펴보기 <ArrowRight size={15} /></a><a className="mobile-menu" href="#features" aria-label="주요 기능으로 이동"><Menu size={22} /></a></div></div></header>
     <main>
-      <section className="hero container" aria-labelledby="hero-title"><div className="hero-copy"><div className="announcement"><span className="announcement-dot" /> CSV 데이터 정제, 더 명확한 시작 <ArrowRight size={14} /></div><h1 id="hero-title">데이터 정제의 시작,<br /><span>DataClinic</span></h1><p className="hero-description">복잡한 데이터도 어디서부터 손봐야 할지 알 수 있도록.<br className="desktop-break" /> CSV의 문제를 살펴보고, 필요한 정제를 선택하고,<br className="desktop-break" /> 달라진 결과까지 확인하세요.</p><div className="hero-actions" aria-describedby="availability-note"><button className="primary-button" type="button" onClick={() => { setInitialSample(false); setUploadOpen(true) }}>지금 분석해보기 <ArrowRight size={18} /></button><button className="secondary-button" type="button" onClick={() => { setInitialSample(true); setUploadOpen(true) }}>예시 데이터로 체험</button></div><p id="availability-note" className="availability-note">CSV 업로드와 미리보기를 사용할 수 있습니다. 데이터 진단과 정제는 준비 중입니다.</p><div className="hero-assurance"><span><Check size={15} /> 설치 없이 브라우저에서</span><span><Check size={15} /> 원본 데이터를 기준으로</span></div></div><DiagnosticPreview /></section>
+      <section className="hero container" aria-labelledby="hero-title"><div className="hero-copy"><div className="announcement"><span className="announcement-dot" /> CSV 데이터 정제, 더 명확한 시작 <ArrowRight size={14} /></div><h1 id="hero-title">데이터 정제의 시작,<br /><span>DataClinic</span></h1><p className="hero-description">복잡한 데이터도 어디서부터 손봐야 할지 알 수 있도록.<br className="desktop-break" /> CSV의 문제를 살펴보고, 필요한 정제를 선택하고,<br className="desktop-break" /> 달라진 결과까지 확인하세요.</p><div className="hero-actions" aria-describedby="availability-note"><button className="primary-button" type="button" onClick={() => { setInitialSample(false); setView('upload') }}>지금 분석해보기 <ArrowRight size={18} /></button><button className="secondary-button" type="button" onClick={() => { setInitialSample(true); setView('upload') }}>예시 데이터로 체험</button></div><p id="availability-note" className="availability-note">CSV 업로드와 데이터 진단을 사용할 수 있습니다. 정제와 비교는 준비 중입니다.</p><div className="hero-assurance"><span><Check size={15} /> 설치 없이 브라우저에서</span><span><Check size={15} /> 원본 데이터를 기준으로</span></div></div><DiagnosticPreview /></section>
       <section className="feature-section" id="features" aria-labelledby="features-title"><div className="container"><div className="section-heading"><div><span className="section-kicker">주요 기능</span><h2 id="features-title">데이터를 이해하는<br />세 가지 단계</h2></div><p>문제를 찾는 순간부터 달라진 결과를 확인할 때까지,<br className="desktop-break" /> 필요한 과정만 간결하게 이어집니다.</p></div><div className="feature-grid">{features.map(({ icon: Icon, number, title, description, tag }) => <article className="feature-card" key={number}><div className="feature-card-top"><span className="feature-icon"><Icon size={24} strokeWidth={1.8} /></span><span className="feature-number">{number}</span></div><h3>{title}</h3><p>{description}</p><span className="feature-tag">{tag}</span></article>)}</div></div></section>
       <section className="process-section container" id="how-it-works" aria-labelledby="process-title"><div className="process-copy"><span className="section-kicker">이용 흐름</span><h2 id="process-title">데이터를 바꾸기 전에,<br />먼저 이해하세요.</h2><p>DataClinic은 문제를 보여주고, 정제의 영향을 살펴본 뒤, 사용자가 직접 적용을 결정하는 흐름을 지향합니다.</p></div><div className="process-steps" aria-label="서비스 이용 흐름"><span>CSV 선택</span><ArrowRight size={18} /><span>문제 확인</span><ArrowRight size={18} /><span>정제 선택</span><ArrowRight size={18} /><span>변화 비교</span></div></section>
     </main>
