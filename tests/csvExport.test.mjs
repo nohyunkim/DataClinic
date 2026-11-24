@@ -28,15 +28,15 @@ test('UTF-8 BOM option prefixes BOM and remains readable', async () => {
 })
 
 test('formula-like prefixes are escaped in headers and cells without changing source', () => {
-  const values = ['=1+1', '+SUM(A1)', '-42', '@cmd', '  =1+1', '\t=1', '\n@cmd', 'safe', '0']
+  const values = ['=1+1', '+SUM(A1)', '-42', '@name', '  =1+1', '\t=1', '\n@name', 'safe', '0']
   const data = dataset(['=헤더', '값'], values.map((value) => [value, '일반']))
   const snapshot = JSON.stringify(data)
   const text = serializeCsv(data)
   const parsed = Papa.parse(text, { delimiter: ',', skipEmptyLines: false }).data
-  assert.equal(formulaRiskCount(data), 8)
+  assert.equal(formulaRiskCount(data), 7)
   assert.equal(parsed[0][0], "'=헤더")
   values.forEach((value, index) => {
-    const risky = index < 7
+    const risky = index < 7 && value !== '-42'
     assert.equal(parsed[index + 1][0], risky ? `'${value}` : value)
   })
   assert.equal(JSON.stringify(data), snapshot)

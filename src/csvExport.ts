@@ -5,7 +5,8 @@ export type DownloadEncoding = 'utf-8' | 'utf-8-bom'
 
 // Papa Parse prepends an apostrophe to values matching this expression.
 // Leading whitespace, tabs, and line breaks can hide a spreadsheet formula.
-export const FORMULA_PREFIX = /^(?:[\t\r\n]|[\s\uFEFF\u200B]*[=+\-@])/u
+// Ordinary negative numeric text does not need an apostrophe.
+export const FORMULA_PREFIX = /^(?:[\t\r\n]|[\s\uFEFF\u200B]*(?:[=+@]|-(?!\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$)))/u
 
 export function formulaRiskCount(data: ParsedCsv): number {
   let count = 0
