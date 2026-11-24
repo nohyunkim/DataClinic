@@ -54,8 +54,7 @@ function modeValue(data: ParsedCsv, columnIndex: number): string | null {
   return selected
 }
 
-export function previewCleaning(data: ParsedCsv, choice: CleaningChoice): CleaningPreview {
-  const before = analyzeData(data)
+export function previewCleaning(data: ParsedCsv, choice: CleaningChoice, before = analyzeData(data)): CleaningPreview {
   const column = before.columns[choice.columnIndex]
   if (choice.method !== 'remove_duplicates' && !column) return blocked(choice, before, '대상 컬럼을 선택해 주세요.')
   if (before.rowCount === 0) return blocked(choice, before, '데이터 행이 없어 정제를 적용할 수 없습니다.')

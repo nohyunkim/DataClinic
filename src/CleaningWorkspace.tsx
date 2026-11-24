@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, ArrowRight, CircleAlert, FileSpreadsheet, RotateCcw, Table2, WandSparkles } from 'lucide-react'
 import type { ParsedCsv } from './csv'
-import { previewCleaning, cloneCsv, type CleaningMethod } from './cleaning'
+import { previewCleaning, type CleaningMethod } from './cleaning'
 import { analyzeData, isMissing } from './diagnosis'
 import './workspace.css'
 import './cleaning.css'
@@ -41,7 +41,7 @@ export default function CleaningWorkspace({ original, working, cleaningCount, on
   const [page, setPage] = useState(0)
   const [notice, setNotice] = useState('')
   const choice = useMemo(() => ({ method, columnIndex }), [method, columnIndex])
-  const preview = useMemo(() => previewCleaning(working, choice), [working, choice])
+  const preview = useMemo(() => previewCleaning(working, choice, diagnosis), [working, choice, diagnosis])
   const affected = useMemo(() => new Set(preview.affectedRowIndices), [preview])
   const duplicates = useMemo(() => new Set(diagnosis.duplicateRows.map(({ rowIndex }) => rowIndex)), [diagnosis])
   const column = diagnosis.columns[columnIndex]
@@ -67,7 +67,7 @@ export default function CleaningWorkspace({ original, working, cleaningCount, on
 
   const apply = () => {
     if (!preview.canApply || !preview.result) return
-    onApply(cloneCsv(preview.result))
+    onApply(preview.result)
     setNotice(`${methodLabels[method]} 작업을 적용했습니다. 작업 데이터의 진단 결과가 갱신되었습니다.`)
   }
 
