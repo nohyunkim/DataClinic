@@ -75,6 +75,7 @@ test('preview and application match without changing original or working input',
   const originalSnapshot = JSON.stringify(original)
   const workingSnapshot = JSON.stringify(working)
   const preview = previewCleaning(working, choice('fill_mean'))
+  assert.deepEqual(previewCleaning(working, choice('fill_mean'), analyzeData(working)), preview)
   assert.equal(JSON.stringify(original), originalSnapshot)
   assert.equal(JSON.stringify(working), workingSnapshot)
   const applied = applyCleaning(working, choice('fill_mean'))
