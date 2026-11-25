@@ -1,6 +1,9 @@
 // Run with: node --expose-gc --experimental-strip-types scripts/benchmark.mjs
 // Synthetic, deterministic CSV only. Timings are for Node.js, not a browser.
 import assert from 'node:assert/strict'
+import { writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { MAX_CSV_BYTES, parseCsvFile } from '../src/csv.ts'
 import { analyzeData } from '../src/diagnosis.ts'
@@ -18,7 +21,7 @@ const scenarios = [
   { name: 'wide-1000', target: MiB, kind: 'wide' },
   { name: 'missing-duplicates', target: MiB, kind: 'duplicates' },
   { name: 'long-cell', target: MiB, kind: 'long' },
-].filter((scenario) => !process.argv[2] || scenario.name === process.argv[2])
+]
 
 function generate({ target, kind }) {
   if (kind === 'long') {
@@ -52,6 +55,16 @@ function generate({ target, kind }) {
   return Buffer.from(lines.join('\n') + '\n')
 }
 
+if (process.argv[2] === '--fixture') {
+  const scenario = scenarios.find(({ name }) => name === process.argv[3])
+  if (!scenario && process.argv[3] !== 'compatibility') throw new Error('Choose rows-5m, wide-1000, or compatibility.')
+  const bytes = scenario ? generate(scenario) : Buffer.from('이름,메모,숫자,수식형\n가,"쉼표, 값",-123,=1+1\n나,"큰따옴표 ""인용""",-3.5,"+SUM(1,2)"\n다,"첫 줄\n둘째 줄",-1e3,@name\n')
+  const path = join(tmpdir(), `dataclinic-${process.argv[3]}.csv`)
+  writeFileSync(path, bytes)
+  console.log(JSON.stringify({ path, bytes: bytes.length }))
+  process.exit(0)
+}
+
 const median = (values) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)]
 async function measure(fn) {
   await fn() // warm up
@@ -74,7 +87,7 @@ const output = {
   scenarios: [],
 }
 
-for (const scenario of scenarios) {
+for (const scenario of scenarios.filter(({ name }) => !process.argv[2] || name === process.argv[2])) {
   const bytes = generate(scenario)
   assert.ok(bytes.length <= MAX_CSV_BYTES)
   const file = new File([bytes], `${scenario.name}.csv`, { type: 'text/csv' })

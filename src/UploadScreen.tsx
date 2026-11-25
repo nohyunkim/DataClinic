@@ -9,10 +9,11 @@ interface UploadScreenProps {
   initialSample: boolean
   parsed: ParsedCsv | null
   onParsed: (data: ParsedCsv | null) => void
+  onDiagnosis: () => void
   onBack: () => void
 }
 
-export default function UploadScreen({ initialSample, parsed, onParsed, onBack }: UploadScreenProps) {
+export default function UploadScreen({ initialSample, parsed, onParsed, onDiagnosis, onBack }: UploadScreenProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const requestId = useRef(0)
   const startedSample = useRef(false)
@@ -21,6 +22,8 @@ export default function UploadScreen({ initialSample, parsed, onParsed, onBack }
   const [status, setStatus] = useState<UploadStatus>('idle')
   const [message, setMessage] = useState('')
   const [dragging, setDragging] = useState(false)
+
+  useEffect(() => () => { requestId.current++; startedSample.current = false }, [])
 
   const loadFile = useCallback(async (nextFile: File, nextEncoding: CsvEncoding) => {
     const currentRequest = ++requestId.current
@@ -68,6 +71,6 @@ export default function UploadScreen({ initialSample, parsed, onParsed, onBack }
         {status === 'success' && <p className="success-message"><Check size={16} /> 파일을 읽었습니다. 진단 결과가 준비되었습니다.</p>}
       </div>
     </section>
-    {status === 'success' && parsed && <section className="data-panel" aria-labelledby="data-preview-title"><div className="data-panel-heading"><div><span className="section-kicker">DATA PREVIEW</span><h2 id="data-preview-title">데이터 미리보기</h2></div><span className="file-pill"><FileSpreadsheet size={16} /> {parsed.fileName}</span></div><div className="data-facts"><span><strong>{parsed.rows.length.toLocaleString()}</strong> 데이터 행</span><span><strong>{parsed.columns.length}</strong> 컬럼</span><span><strong>{(parsed.fileSize / 1024).toFixed(1)} KB</strong> 파일 크기</span><span><strong>{parsed.encoding === 'utf-8' ? 'UTF-8' : 'CP949'}</strong> 인코딩</span></div><div className="table-scroll" role="region" aria-label="CSV 처음 10개 행" tabIndex={0}><table><thead><tr>{parsed.columns.map((column, index) => <th key={index} scope="col">{column}</th>)}</tr></thead><tbody>{parsed.rows.slice(0, 10).map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex}>{cell || <span className="empty-cell">빈 값</span>}</td>)}</tr>)}</tbody></table></div><p className="preview-note">처음 10개 행만 표시합니다. 진단 결과는 진단 화면에서 확인할 수 있습니다.</p></section>}
+    {status === 'success' && parsed && <section className="data-panel" aria-labelledby="data-preview-title"><div className="data-panel-heading"><div><span className="section-kicker">DATA PREVIEW</span><h2 id="data-preview-title">데이터 미리보기</h2></div><span className="file-pill"><FileSpreadsheet size={16} /> {parsed.fileName}</span></div><div className="data-facts"><span><strong>{parsed.rows.length.toLocaleString()}</strong> 데이터 행</span><span><strong>{parsed.columns.length}</strong> 컬럼</span><span><strong>{(parsed.fileSize / 1024).toFixed(1)} KB</strong> 파일 크기</span><span><strong>{parsed.encoding === 'utf-8' ? 'UTF-8' : 'CP949'}</strong> 인코딩</span></div><div className="table-scroll" role="region" aria-label="CSV 처음 10개 행" tabIndex={0}><table><thead><tr>{parsed.columns.map((column, index) => <th key={index} scope="col">{column}</th>)}</tr></thead><tbody>{parsed.rows.slice(0, 10).map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex}>{cell || <span className="empty-cell">빈 값</span>}</td>)}</tr>)}</tbody></table></div><p className="preview-note">처음 10개 행만 표시합니다. 진단 결과는 진단 화면에서 확인할 수 있습니다.</p><button className="primary-button upload-continue" type="button" onClick={onDiagnosis}>진단 결과 확인</button></section>}
   </main>
 }
