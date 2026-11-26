@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, ArrowRight, CircleAlert, FileSpreadsheet, RotateCcw, Table2, WandSparkles } from 'lucide-react'
 import type { ParsedCsv } from './csv'
-import { previewCleaning, type CleaningMethod } from './cleaning'
+import { previewCleaning, type CleaningChoice, type CleaningMethod } from './cleaning'
+import { MAX_RECIPE_BYTES, MAX_RECIPE_STEPS, parseRecipe, previewRecipe, serializeRecipe, type CleaningRecipe, type RecipeStep } from './recipe'
 import { analyzeData, isMissing } from './diagnosis'
 import { columnLabels } from './columnLabel'
 import './workspace.css'
@@ -11,7 +12,11 @@ interface CleaningWorkspaceProps {
   original: ParsedCsv
   working: ParsedCsv
   cleaningCount: number
-  onApply: (data: ParsedCsv) => void
+  history: RecipeStep[]
+  loadedRecipe: CleaningRecipe | null
+  onLoadedRecipe: (recipe: CleaningRecipe | null) => void
+  onApply: (data: ParsedCsv, choice: CleaningChoice) => void
+  onApplyRecipe: (data: ParsedCsv, steps: RecipeStep[]) => void
   onReset: () => void
   onDiagnosis: () => void
   onComparison: () => void
@@ -35,13 +40,15 @@ const methodDescriptions: Record<CleaningMethod, string> = {
   remove_duplicates: '모든 컬럼의 원본 값이 같은 행 중 첫 행만 남깁니다. 공백과 대소문자는 그대로 비교합니다.',
 }
 
-export default function CleaningWorkspace({ original, working, cleaningCount, onApply, onReset, onDiagnosis, onComparison, onUpload, onHome }: CleaningWorkspaceProps) {
+export default function CleaningWorkspace({ original, working, cleaningCount, history, loadedRecipe, onLoadedRecipe, onApply, onApplyRecipe, onReset, onDiagnosis, onComparison, onUpload, onHome }: CleaningWorkspaceProps) {
   const diagnosis = useMemo(() => analyzeData(working), [working])
   const labels = useMemo(() => columnLabels(working.columns), [working.columns])
   const [columnIndex, setColumnIndex] = useState(() => diagnosis.columns.find((column) => column.missingCount > 0)?.index ?? 0)
   const [method, setMethod] = useState<CleaningMethod>('remove_missing')
   const [page, setPage] = useState(0)
   const [notice, setNotice] = useState('')
+  const [recipeError, setRecipeError] = useState('')
+  const recipePreview = useMemo(() => loadedRecipe ? previewRecipe(working, loadedRecipe) : null, [working, loadedRecipe])
   const choice = useMemo(() => ({ method, columnIndex }), [method, columnIndex])
   const preview = useMemo(() => previewCleaning(working, choice, diagnosis), [working, choice, diagnosis])
   const affected = useMemo(() => new Set(preview.affectedRowIndices), [preview])
@@ -69,7 +76,7 @@ export default function CleaningWorkspace({ original, working, cleaningCount, on
 
   const apply = () => {
     if (!preview.canApply || !preview.result) return
-    onApply(preview.result)
+    onApply(preview.result, choice)
     setNotice(`${methodLabels[method]} 작업을 적용했습니다. 작업 데이터의 진단 결과가 갱신되었습니다.`)
   }
 
@@ -79,12 +86,58 @@ export default function CleaningWorkspace({ original, working, cleaningCount, on
     setNotice('작업 데이터를 업로드 직후 원본으로 초기화했습니다.')
   }
 
+  const saveRecipe = () => {
+    if (!history.length) return
+    if (history.length > MAX_RECIPE_STEPS) { setRecipeError(`레시피는 최대 ${MAX_RECIPE_STEPS}단계까지 저장할 수 있습니다.`); return }
+    const blob = new Blob([serializeRecipe(history)], { type: 'application/json' })
+    if (blob.size > MAX_RECIPE_BYTES) { setRecipeError('레시피가 64KB를 초과하여 저장할 수 없습니다.'); return }
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'dataclinic-recipe.json'
+    link.style.display = 'none'
+    document.body.append(link)
+    try { link.click() } finally { link.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+    setNotice(`${history.length}단계 레시피 JSON을 저장했습니다.`)
+  }
+
+  const loadRecipe = async (file: File | undefined) => {
+    if (!file) return
+    onLoadedRecipe(null)
+    setRecipeError('')
+    if (file.size === 0 || file.size > MAX_RECIPE_BYTES) {
+      setRecipeError('레시피 파일은 비어 있지 않은 64KB 이하 JSON이어야 합니다.')
+      return
+    }
+    try {
+      const parsed = parseRecipe(await file.text())
+      onLoadedRecipe(parsed)
+      setNotice(`${parsed.steps.length}단계 레시피를 불러왔습니다. 데이터는 아직 변경되지 않았습니다.`)
+    } catch (error) {
+      setRecipeError(error instanceof Error ? error.message : '레시피를 읽을 수 없습니다.')
+    }
+  }
+
+  const applyRecipe = () => {
+    if (!loadedRecipe || !recipePreview?.result || recipePreview.error) return
+    const applied = loadedRecipe.steps.filter((step) => recipePreview.impacts[step.order - 1]?.status === 'applied')
+    onApplyRecipe(recipePreview.result, applied)
+    setNotice(`레시피 ${applied.length}단계를 적용했습니다.${recipePreview.impacts.length - applied.length ? ` 대상이 없는 ${recipePreview.impacts.length - applied.length}단계는 건너뛰었습니다.` : ''}`)
+  }
+
   return <div className="workspace-shell">
     <header className="workspace-header"><button className="workspace-brand" type="button" onClick={onHome} aria-label="DataClinic 홈"><span className="brand-mark" aria-hidden="true"><i /><i /><i /><i /></span><span>Data<span>Clinic</span></span></button><div className="workspace-dataset"><FileSpreadsheet size={17} /><strong title={working.fileName}>{working.fileName}</strong></div><div className="workspace-flow" aria-label="작업 단계"><span className="done">업로드</span><ArrowRight size={13} /><span className="done">진단</span><ArrowRight size={13} /><span className="active">정제</span><ArrowRight size={13} /><span>비교</span><ArrowRight size={13} /><span>다운로드</span></div></header>
     <div className="workspace-layout">
       <aside className="workspace-nav" aria-label="워크스페이스 메뉴"><p>WORKSPACE</p><button type="button" onClick={onDiagnosis}><CircleAlert size={16} /> 데이터 진단</button><a href="#cleaning-table"><Table2 size={16} /> 작업 데이터</a><a href="#impact-preview"><WandSparkles size={16} /> 영향 미리보기</a><button type="button" onClick={onComparison}><ArrowRight size={16} /> 정제 전후 비교</button><button type="button" onClick={onUpload}><ArrowLeft size={16} /> 업로드 화면</button><small>정제는 작업 데이터에만 적용됩니다. 원본은 별도로 보관됩니다.</small></aside>
       <main className="workspace-main"><div className="workspace-title"><span className="section-kicker">03 / DATA CLEANING</span><h1>데이터 정제</h1><p>방법을 선택하고 예상 변화를 확인한 뒤 적용하세요.</p></div>
         {notice && <div className="cleaning-notice" role="status">{notice}</div>}
+        <section className="workspace-card recipe-card" aria-labelledby="recipe-title">
+          <div className="workspace-section-head"><div><span className="section-kicker">CLEANING RECIPE</span><h2 id="recipe-title">정제 레시피</h2></div><span className="workspace-subtle">적용한 작업만 저장합니다</span></div>
+          <div className="recipe-actions"><button type="button" disabled={!history.length} onClick={saveRecipe}>레시피 JSON 저장</button><label>레시피 JSON 불러오기<input type="file" accept=".json,application/json" onChange={(event) => { void loadRecipe(event.target.files?.[0]); event.target.value = '' }} /></label></div>
+          {history.length > 0 && <p className="recipe-summary">현재 데이터에 적용한 작업 {history.length}단계가 저장 대상입니다.</p>}
+          {recipeError && <p className="recipe-error" role="alert">{recipeError}</p>}
+          {loadedRecipe && <div className="recipe-loaded"><h3>불러온 작업 순서</h3><ol>{loadedRecipe.steps.map((step, index) => { const impact = recipePreview?.impacts[index]; return <li key={step.order}><strong>{methodLabels[step.method]}</strong><span>{step.column ? `${step.column.name} · ${step.column.index + 1}번째 컬럼` : '전체 컬럼'}</span><small>{impact?.status === 'applied' ? `${impact.removedRows}행 삭제 · ${impact.changedCells}셀 변경 예상` : impact?.status === 'skipped' ? `대상 없음 · 건너뜀 (${impact.reason})` : '확인 필요'}</small></li> })}</ol>{recipePreview?.error && <p className="recipe-error" role="alert">{recipePreview.error}</p>}{!recipePreview?.error && <p className="recipe-summary">예상 결과: {working.rows.length}행 → {recipePreview?.result?.rows.length ?? '—'}행 · 불러오기만으로 데이터는 변경되지 않습니다.</p>}<button className="recipe-apply" type="button" disabled={!!recipePreview?.error || !recipePreview?.impacts.some((impact) => impact.status === 'applied')} onClick={applyRecipe}>레시피 적용하기</button></div>}
+        </section>
         <section className="workspace-card" aria-label="작업 데이터 요약"><div className="workspace-section-head"><div><span className="section-kicker">WORKING DATA</span><h2>현재 작업 데이터</h2></div><span className="workspace-subtle">정제 적용 {cleaningCount}회 · 원본 {original.rows.length.toLocaleString()}행 보존</span></div><div className="workspace-summary"><div><span>현재 행</span><strong>{diagnosis.rowCount.toLocaleString()}</strong></div><div><span>컬럼</span><strong>{diagnosis.columnCount.toLocaleString()}</strong></div><div><span>결측 셀</span><strong>{diagnosis.missingCellCount.toLocaleString()}</strong></div><div><span>중복 행</span><strong>{diagnosis.duplicateRows.length.toLocaleString()}</strong></div></div></section>
         <section id="cleaning-table" className="workspace-card" aria-labelledby="cleaning-table-title"><div className="workspace-section-head"><div><span className="section-kicker">DATA TABLE</span><h2 id="cleaning-table-title">작업 데이터 미리보기</h2></div><span className="workspace-subtle">{working.rows.length ? `${start + 1}–${Math.min(start + PAGE_SIZE, working.rows.length)} / ${working.rows.length.toLocaleString()}행` : '0행'}</span></div><div className="diagnosis-table-scroll" role="region" aria-label="정제 작업 데이터 표" tabIndex={0}><table><thead><tr><th scope="col" className="row-number">행</th>{working.columns.map((_, index) => <th scope="col" key={index} className={columnIndex === index && method !== 'remove_duplicates' ? 'selected-column' : ''}><button type="button" onClick={() => { setColumnIndex(index); setNotice('') }}>{labels[index]}</button></th>)}</tr></thead><tbody>{rows.map((row, offset) => { const rowIndex = start + offset; const willRemove = preview.canApply && isRemoval && affected.has(rowIndex); const willFill = preview.canApply && !isRemoval && affected.has(rowIndex); return <tr key={rowIndex} className={`${duplicates.has(rowIndex) ? 'duplicate-row ' : ''}${willRemove ? 'preview-remove-row' : ''}`}><th scope="row" className="row-number"><span>{rowIndex + 1}</span>{willRemove && <small>삭제 예정</small>}{!willRemove && duplicates.has(rowIndex) && <small>중복</small>}</th>{row.map((value, cellIndex) => <td key={cellIndex} className={`${isMissing(value) ? 'missing-cell ' : ''}${columnIndex === cellIndex && method !== 'remove_duplicates' ? 'selected-column ' : ''}${willFill && columnIndex === cellIndex ? 'preview-fill-cell' : ''}`}>{isMissing(value) ? <span>빈 값</span> : value}{willFill && columnIndex === cellIndex && <small className="preview-replacement">→ {preview.replacementValue}</small>}</td>)}</tr> })}</tbody></table></div>{working.rows.length === 0 && <p className="empty-table">데이터 행이 없습니다.</p>}<div className="table-footer"><span><i className="legend-missing" /> 결측 셀 <i className="legend-duplicate" /> 중복 행</span><div><button type="button" disabled={page === 0} onClick={() => setPage(page - 1)}>이전</button><span>{page + 1} / {pageCount}</span><button type="button" disabled={page >= pageCount - 1} onClick={() => setPage(page + 1)}>다음</button></div></div></section>
         <section id="impact-preview" className="workspace-card" aria-labelledby="impact-title"><div className="workspace-section-head"><div><span className="section-kicker">IMPACT PREVIEW</span><h2 id="impact-title">적용 전 영향 미리보기</h2></div><span className="workspace-subtle">예상 결과는 현재 작업 데이터에 아직 적용되지 않았습니다</span></div><p className="impact-method">{methodLabels[method]} · {method === 'remove_duplicates' ? '전체 컬럼' : column ? labels[columnIndex] : '컬럼 미선택'}</p><div className="impact-stats"><div><span>현재 → 예상 행</span><strong>{preview.before.rowCount.toLocaleString()} → {preview.after?.rowCount.toLocaleString() ?? '—'}</strong></div><div><span>삭제 행 / 변경 셀</span><strong>{preview.removedRows.toLocaleString()}행 / {preview.changedCells.toLocaleString()}셀</strong></div><div><span>행 손실 비율</span><strong>{(preview.dataLossRate * 100).toFixed(1)}%</strong></div><div><span>셀 변경 비율</span><strong>{(cellChangeRate * 100).toFixed(1)}%</strong></div><div><span>결측 셀 전 → 후</span><strong>{preview.before.missingCellCount.toLocaleString()} → {preview.after?.missingCellCount.toLocaleString() ?? '—'}</strong></div><div><span>중복 행 전 → 후</span><strong>{preview.before.duplicateRows.length.toLocaleString()} → {preview.after?.duplicateRows.length.toLocaleString() ?? '—'}</strong></div></div>{preview.replacementValue !== null && <p className="impact-replacement">대체할 값: <strong>{preview.replacementValue}</strong></p>}{preview.examples.length > 0 && <div className="impact-examples"><h3>변경 예시 <small>최대 5개</small></h3>{preview.examples.map((example) => <div key={example.rowNumber}><span>{example.rowNumber}행</span><span title={example.before}>{example.before || '빈 값'}</span><ArrowRight size={13} /><strong title={example.after}>{example.after}</strong></div>)}</div>}{!preview.canApply && <p className="impact-blocked"><CircleAlert size={16} /> {preview.reason}</p>}</section>
