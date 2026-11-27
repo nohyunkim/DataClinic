@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://dataclinic.studymate-web-7c0b15.workers.dev/sitemap.xml
